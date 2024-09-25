@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Route Avoidance</title>
+    <style>
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        #result {
+            margin-top: 20px;
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyByFSdw5BlX97jCavPq1-mZySQfqAlFbDs&libraries=places"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+
+<h3>Select Start and End Points on the Map</h3>
+<div id="map"></div>
+<button id="calculateRouteBtn">Calculate Route</button>
+<p id="result"></p>
+
+<script>
+    let map;
+    let startMarker = null;
+    let endMarker = null;
+
+    function initMap() {
+        // Initialize the map
+        map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 12,
+            center: { lat: 24.760322, lng: 46.732212 },
+        });
+
+        // Set event listener for map clicks to set start and end markers
+        google.maps.event.addListener(map, 'click', function(event) {
+            if (!startMarker) {
+                startMarker = new google.maps.Marker({
+                    position: event.latLng,
+                    map: map,
+                    label: "A",
+                    title: "Start Point"
+                });
+            } else if (!endMarker) {
+                endMarker = new google.maps.Marker({
+                    position: event.latLng,
+                    map: map,
+                    label: "B",
+                    title: "End Point"
+                });
+            }
+        });
+
+        // Add button event listener
+        document.getElementById("calculateRouteBtn").addEventListener("click", calculateRoute);
+    }
+
+    function calculateRoute() {
+        if (startMarker && endMarker) {
+            const start = { lat: startMarker.getPosition().lat(), lng: startMarker.getPosition().lng() };
+            const end = { lat: endMarker.getPosition().lat(), lng: endMarker.getPosition().lng() };
+
+            // Send start and end points to the Flask backend
+            $.ajax({
+                url: '/calculate-route',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ start: start, end: end }),
+                success: function(response) {
+                    if (response.status === 'success') {
+                        const link = response.gmaps_link;
+                        document.getElementById("result").innerHTML = `<a href="${link}" target="_blank">Open Route in Google Maps</a>`;
+                    } else {
+                        document.getElementById("result").textContent = response.message;
+                    }
+                },
+                error: function(error) {
+                    document.getElementById("result").textContent = 'Error calculating route.';
+                }
+            });
+        } else {
+            alert("Please select both a start and end point on the map.");
+        }
+    }
+
+    // Initialize the map on page load
+    window.onload = initMap;
+</script>
+
+</body>
+</html>
