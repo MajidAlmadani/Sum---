@@ -1,94 +1,353 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Maps Route Avoidance</title>
-    <style>
-        #map {
-            height: 500px;
-            width: 100%;
-        }
-        #result {
-            margin-top: 20px;
-        }
-    </style>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyByFSdw5BlX97jCavPq1-mZySQfqAlFbDs&libraries=places"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vehicle Dashboard</title>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyByFSdw5BlX97jCavPq1-mZySQfqAlFbDs&libraries=geometry"></script>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <style>
+            /* General styling */
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                background-color: #f0f0f0;
+            }
+    
+            /* Dashboard styling */
+            .dashboard {
+                background-color: #e0e0e0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 20px;
+                margin-bottom: 10px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+    
+            /* Grid background */
+            body {
+                background-image: linear-gradient(#d3d3d3 1px, transparent 1px), linear-gradient(90deg, #d3d3d3 1px, transparent 1px);
+                background-size: 40px 40px;
+            }
+    
+            /* Icon and text styling */
+            .dashboard-item {
+                display: flex;
+                align-items: center;
+            }
+    
+            .dashboard-item i {
+                font-size: 24px;
+                margin-right: 10px;
+            }
+    
+            .dashboard-item .label {
+                font-size: 18px;
+                font-weight: bold;
+            }
+    
+            .dashboard-item .cost {
+                font-size: 16px;
+                color: #666;
+            }
+    
+            .timestamp {
+                font-size: 18px;
+                font-weight: bold;
+                color: #333;
+            }
+    
+            /* Map container */
+            #map {
+                height: 500px;
+                width: 100%;
+            }
+    
+            /* Form buttons */
+            #routeForm {
+                display: flex;
+                justify-content: center;
+                margin-top: 20px;
+            }
+    
+            #routeForm button {
+                margin: 10px;
+                padding: 10px 20px;
+                font-size: 16px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                cursor: pointer;
+            }
+    
+            #routeForm button:hover {
+                background-color: #45a049;
+            }
+    
+            /* Align buttons below the map */
+            #routeForm {
+                display: flex;
+                flex-direction: row;
+                justify-content: center;
+                margin-top: 20px;
+            }
+        </style>
 </head>
 <body>
 
-<h3>Select Start and End Points on the Map</h3>
-<div id="map"></div>
-<button id="calculateRouteBtn">Calculate Route</button>
-<p id="result"></p>
+    <!-- Dashboard Section -->
+    <div class="dashboard">
+        <div class="dashboard-item">
+            <i class="fas fa-truck"></i>
+            <div>
+                <span class="label">Truck: </span>
+                <span class="cost">5000 SAR</span>
+            </div>
+        </div>
+        <div class="dashboard-item">
+            <i class="fas fa-car"></i>
+            <div>
+                <span class="label">Car: </span>
+                <span class="cost">3000 SAR</span>
+            </div>
+        </div>
+        <div class="dashboard-item">
+            <i class="fas fa-motorcycle"></i>
+            <div>
+                <span class="label">Motorbike: </span>
+                <span class="cost">1500 SAR</span>
+            </div>
+        </div>
+        <div class="dashboard-item">
+            <i class="fas fa-tachometer-alt"></i>
+            <div>
+                <span class="label">Total Vehicles: </span>
+                <span class="cost" id="vehicleCounter">150</span>
+            </div>
+        </div>
+        <div class="dashboard-item">
+            <i class="fas fa-clock"></i>
+            <div class="timestamp" id="timestamp"></div>
+        </div>
+    </div>
 
-<script>
-    let map;
-    let startMarker = null;
-    let endMarker = null;
+    <!-- Google Map Section -->
+    <div id="map" style="height: 500px; width: 100%;"></div>
 
-    function initMap() {
+    <!-- Form Section (Buttons below the map) -->
+    <form id="routeForm">
+        <input type="hidden" id="startLatLng">
+        <input type="hidden" id="endLatLng">
+        <button type="submit" disabled>Get Route</button>
+        <button type="button" id="resetBtn">Reset</button>
+    </form>
+
+    <!-- JavaScript for Real-time Timestamp -->
+    <script>
+        // Initialize variables
+        let map, routePath, startMarker, endMarker;
+        let startLatLng = null;
+        let endLatLng = null;
+        let avoidedRoutePaths = [];  // Store the avoided route paths
+
+        // Update timestamp every second
+        function updateTime() {
+            const now = new Date();
+            const formattedTime = now.toLocaleString('en-US', {
+                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
+            });
+            document.getElementById('timestamp').innerText = formattedTime;
+        }
+        setInterval(updateTime, 1000); // Update time every second
+
         // Initialize the map
-        map = new google.maps.Map(document.getElementById('map'), {
-            zoom: 12,
-            center: { lat: 24.760322, lng: 46.732212 },
-        });
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 24.7136, lng: 46.6753 }, // Riyadh coordinates
+                zoom: 12
+            });
 
-        // Set event listener for map clicks to set start and end markers
-        google.maps.event.addListener(map, 'click', function(event) {
-            if (!startMarker) {
-                startMarker = new google.maps.Marker({
-                    position: event.latLng,
-                    map: map,
-                    label: "A",
-                    title: "Start Point"
+            // Add click event listener to capture start and end locations
+            map.addListener('click', function(event) {
+                handleMapClick(event.latLng);
+            });
+
+            // Load and display avoided routes
+            loadAvoidedRoutes();
+        }
+
+        // Load avoided routes from the server and display them on the map
+        function loadAvoidedRoutes() {
+            $.ajax({
+                url: '/get-avoided-routes',
+                type: 'GET',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        drawAvoidedRoutes(response.avoided_routes);  // Draw avoided routes in red
+                    } else {
+                        alert('Failed to load avoided routes.');
+                    }
+                },
+                error: function() {
+                    alert('Failed to retrieve the avoided routes.');
+                }
+            });
+        }
+
+        // Draw the avoided routes in red
+        function drawAvoidedRoutes(avoidedRoutes) {
+            // Remove any existing avoided routes
+            avoidedRoutePaths.forEach(path => path.setMap(null));
+            avoidedRoutePaths = [];
+
+            avoidedRoutes.forEach(route => {
+                const decodedPolyline = google.maps.geometry.encoding.decodePath(route.overview_polyline);
+                const avoidedPath = new google.maps.Polyline({
+                    path: decodedPolyline,
+                    geodesic: true,
+                    strokeColor: '#FF0000',  // Red color for avoided routes
+                    strokeOpacity: 0.7,
+                    strokeWeight: 4
                 });
-            } else if (!endMarker) {
-                endMarker = new google.maps.Marker({
-                    position: event.latLng,
-                    map: map,
-                    label: "B",
-                    title: "End Point"
-                });
+                avoidedPath.setMap(map);
+                avoidedRoutePaths.push(avoidedPath);  // Store the avoided route
+            });
+        }
+
+        // Handle clicks on the map to select start and end points
+        function handleMapClick(latLng) {
+            if (!startLatLng) {
+                // Set the start marker
+                startLatLng = latLng;
+                placeMarker(latLng, 'Start');
+                $('#startLatLng').val(latLng.lat() + ',' + latLng.lng());
+        
+                // Log the start point for debugging
+                console.log("Start LatLng set: ", $('#startLatLng').val());
+            } else if (!endLatLng) {
+                // Set the end marker
+                endLatLng = latLng;
+                placeMarker(latLng, 'End');
+                $('#endLatLng').val(latLng.lat() + ',' + latLng.lng());
+        
+                // Log the end point for debugging
+                console.log("End LatLng set: ", $('#endLatLng').val());
+        
+                // Enable the "Get Route" button after both points are selected
+                $('button[type=submit]').prop('disabled', false);
             }
-        });
+        }
 
-        // Add button event listener
-        document.getElementById("calculateRouteBtn").addEventListener("click", calculateRoute);
-    }
+        // Place marker for the selected location (start or end)
+        function placeMarker(latLng, label) {
+            let marker = new google.maps.Marker({
+                position: latLng,
+                map: map,
+                label: label,
+                draggable: false
+            });
 
-    function calculateRoute() {
-        if (startMarker && endMarker) {
-            const start = { lat: startMarker.getPosition().lat(), lng: startMarker.getPosition().lng() };
-            const end = { lat: endMarker.getPosition().lat(), lng: endMarker.getPosition().lng() };
+            if (label === 'Start') {
+                if (startMarker) startMarker.setMap(null);  // Remove old marker
+                startMarker = marker;
+            } else if (label === 'End') {
+                if (endMarker) endMarker.setMap(null);  // Remove old marker
+                endMarker = marker;
+            }
+        }
 
-            // Send start and end points to the Flask backend
+        // Form submission handler to  and draw the route
+        $('#routeForm').on('submit', function(e) {
+            e.preventDefault();
+        
+            const start = $('#startLatLng').val();
+            const end = $('#endLatLng').val();
+        
+            // Debugging: Log the start and end values before sending
+            console.log("Submitting Start: ", start);
+            console.log("Submitting End: ", end);
+        
+            if (!start || !end) {
+                alert("Start and End points are required.");
+                return;
+            }
+        
             $.ajax({
                 url: '/calculate-route',
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({ start: start, end: end }),
+                data: JSON.stringify({ start, end }),
                 success: function(response) {
                     if (response.status === 'success') {
-                        const link = response.gmaps_link;
-                        document.getElementById("result").innerHTML = `<a href="${link}" target="_blank">Open Route in Google Maps</a>`;
+                        drawMainRoute(response.route.overview_polyline);  // Draw the main route in blue
                     } else {
-                        document.getElementById("result").textContent = response.message;
+                        alert(response.message);  // Show the error message
                     }
                 },
-                error: function(error) {
-                    document.getElementById("result").textContent = 'Error calculating route.';
+                error: function(xhr, status, error) {
+                    console.error("Error: ", error);
+                    alert('Failed to retrieve the route. Please try again.');
                 }
             });
-        } else {
-            alert("Please select both a start and end point on the map.");
-        }
-    }
+        });
 
-    // Initialize the map on page load
-    window.onload = initMap;
-</script>
+        // Draw the main route in blue
+        function drawMainRoute(polyline) {
+            const decodedPolyline = google.maps.geometry.encoding.decodePath(polyline);
+            if (routePath) {
+                routePath.setMap(null); // Remove the old route
+            }
+
+            routePath = new google.maps.Polyline({
+                path: decodedPolyline,
+                geodesic: true,
+                strokeColor: '#0000FF',  // Blue color for main route
+                strokeOpacity: 1.0,
+                strokeWeight: 4
+            });
+
+            routePath.setMap(map);
+            map.fitBounds(getBounds(decodedPolyline)); // Adjust the map to fit the route
+        }
+
+        // Get the bounds for the polyline
+        function getBounds(decodedPolyline) {
+            const bounds = new google.maps.LatLngBounds();
+            decodedPolyline.forEach(point => {
+                bounds.extend(point);
+            });
+            return bounds;
+        }
+
+        // Reset button handler: clear markers, route, and form
+        $('#resetBtn').on('click', function() {
+            // Remove markers and route from the map
+            if (startMarker) startMarker.setMap(null);
+            if (endMarker) endMarker.setMap(null);
+            if (routePath) routePath.setMap(null);
+
+            // Remove avoided routes
+            avoidedRoutePaths.forEach(path => path.setMap(null));
+            avoidedRoutePaths = [];
+
+            // Clear stored start/end points
+            startLatLng = null;
+            endLatLng = null;
+
+            // Clear hidden input fields and disable "Get Route" button
+            $('#startLatLng').val('');
+            $('#endLatLng').val('');
+            $('button[type=submit]').prop('disabled', true);
+
+            // Reload avoided routes
+            loadAvoidedRoutes();
+        });
+
+        // Initialize the map
+        initMap();
+    </script>
 
 </body>
 </html>
