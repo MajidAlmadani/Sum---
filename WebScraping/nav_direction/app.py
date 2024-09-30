@@ -89,32 +89,47 @@ def find_route_avoiding_segments(start, end, avoid_list):
 
     return None, None
 
-SAUDI_BOUNDING_BOX = {
-    'north': 32.1546,   # Northernmost latitude in Saudi Arabia
-    'south': 16.0036,   # Southernmost latitude in Saudi Arabia
-    'west': 34.4956,    # Westernmost longitude in Saudi Arabia
-    'east': 55.6667     # Easternmost longitude in Saudi Arabia
+RIYADH_BOUNDING_BOX = {
+    'north': 25.0885,   # Northernmost latitude in Riyadh
+    'south': 24.3246,   # Southernmost latitude in Riyadh
+    'west': 46.2613,    # Westernmost longitude in Riyadh
+    'east': 47.0484     # Easternmost longitude in Riyadh
 }
 
 def is_within_bounds(lat, lng):
-    """Check if a given latitude and longitude are within Saudi Arabia."""
-    return (SAUDI_BOUNDING_BOX['south'] <= lat <= SAUDI_BOUNDING_BOX['north'] and
-            SAUDI_BOUNDING_BOX['west'] <= lng <= SAUDI_BOUNDING_BOX['east'])
+    """Check if a given latitude and longitude are within the Riyadh bounding box."""
+    return (RIYADH_BOUNDING_BOX['south'] <= lat <= RIYADH_BOUNDING_BOX['north'] and
+            RIYADH_BOUNDING_BOX['west'] <= lng <= RIYADH_BOUNDING_BOX['east'])
+
+def is_route_within_bounds(route):
+    """Check if the entire route stays within the Riyadh bounding box."""
+    # Go through each step in the route and check the start and end locations
+    for leg in route['legs']:
+        for step in leg['steps']:
+            start_lat = step['start_location']['lat']
+            start_lng = step['start_location']['lng']
+            end_lat = step['end_location']['lat']
+            end_lng = step['end_location']['lng']
+
+            if not is_within_bounds(start_lat, start_lng) or not is_within_bounds(end_lat, end_lng):
+                return False
+    return True
 
 def find_mid_point_between(start, end):
-    """Finds a mid-point between start and end, ensuring it is within Saudi Arabia."""
+    """Finds a mid-point between start and end, ensuring it is within Riyadh."""
     start_lat, start_lng = map(float, start.split(','))
     end_lat, end_lng = map(float, end.split(','))
 
     mid_lat = (start_lat + end_lat) / 2
     mid_lng = (start_lng + end_lng) / 2
 
-    # Check if the mid-point is within the valid range (Saudi Arabia bounds)
+    # Check if the mid-point is within the Riyadh bounding box
     if is_within_bounds(mid_lat, mid_lng):
         return f"{mid_lat},{mid_lng}"
     else:
         # If the mid-point is outside bounds, return None
         return None
+
 
 def recursive_route_search(start, end, avoid_list, depth=0, max_depth=3):
     """
@@ -148,6 +163,15 @@ def recursive_route_search(start, end, avoid_list, depth=0, max_depth=3):
     # If both segments are valid, merge them and return
     return merge_segments(first_segment, second_segment)
 
+def merge_segments(first_segment, second_segment):
+    """Merges two route segments into one."""
+    merged_route = {
+        'legs': first_segment['legs'] + second_segment['legs'],
+        'overview_polyline': {
+            'points': first_segment['overview_polyline']['points'] + second_segment['overview_polyline']['points']
+        }
+    }
+    return merged_route
 def find_valid_route(start, end, avoid_list):
     """Attempts to find a valid route from start to end, avoiding specific segments."""
     # Get routes from A to B (with alternatives)
@@ -159,6 +183,10 @@ def find_valid_route(start, end, avoid_list):
     # Iterate through all available routes
     for route in routes:
         route_a_b_points = decode_polyline_to_points(route['overview_polyline']['points'])
+
+        # Ensure the entire route stays within bounds
+        if not is_route_within_bounds(route):
+            continue  # Skip this route if it goes outside the bounding box
 
         # Assume this route is valid until proven otherwise
         avoid_crossing = False
