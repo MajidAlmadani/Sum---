@@ -1,0 +1,26 @@
+<annotation>
+    <folder>From-Labelbox-license-characters-593images</folder>
+    <filename>ckifm2pr9009u246a9d113o4t.jpeg</filename>
+    <path>/home/riotu/Object Detection/Datasets/Car-detection/License-characters/From-Labelbox-license-characters-593images/ckifm2pr9009u246a9d113o4t.jpeg</path>
+    <source>
+        <database>Unknown</database>
+    </source>
+    <size>
+        <width>596</width>
+        <height>485</height>
+        <depth>3</depth>
+    </size>
+    <segmented>0</segmented>
+    <object>
+        <name>1</name>
+        <pose>Unspecified</pose>
+        <truncated>0</truncated>
+        <difficult>0</difficult>
+        <bndbox>
+                <xmin>258</xmin>
+                <ymin>136</ymin>
+                <xmax>314</xmax>
+                <ymax>364</ymax>
+            </bndbox>
+        </object>
+    </annotation>

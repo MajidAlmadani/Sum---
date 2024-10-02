@@ -1,0 +1,26 @@
+<annotation>
+    <folder>From-Labelbox-license-characters-593images</folder>
+    <filename>ckie8dri1006k246ad5klxch2.jpeg</filename>
+    <path>/home/riotu/Object Detection/Datasets/Car-detection/License-characters/From-Labelbox-license-characters-593images/ckie8dri1006k246ad5klxch2.jpeg</path>
+    <source>
+        <database>Unknown</database>
+    </source>
+    <size>
+        <width>123</width>
+        <height>86</height>
+        <depth>3</depth>
+    </size>
+    <segmented>0</segmented>
+    <object>
+        <name>J</name>
+        <pose>Unspecified</pose>
+        <truncated>0</truncated>
+        <difficult>0</difficult>
+        <bndbox>
+                <xmin>63</xmin>
+                <ymin>17</ymin>
+                <xmax>80</xmax>
+                <ymax>65</ymax>
+            </bndbox>
+        </object>
+    </annotation>
