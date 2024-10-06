@@ -46,6 +46,6 @@
   - LinkedIn: [ahmed-bashmmakh](https://www.linkedin.com/in/ahmed-bashmmakh/)
  
 - **[Sarah Alkanhal]**
-  -  
+  - Email: [] 
   - GitHub: [yourusername]()  
   - LinkedIn: [yourlinkedin]()  
