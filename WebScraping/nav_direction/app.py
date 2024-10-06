@@ -4,22 +4,65 @@ from polyline import decode
 import os
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup  # To clean HTML tags
+import pymysql
+import pandas as pd
 
 load_dotenv()
-API_KEY = os.getenv('GOOGLE_MAPS_API_KEY_3')
+API_KEY = 'AIzaSyBvsVrsscV50q6bVV7ofEm2tzCz08F1k1A'
 gmaps = googlemaps.Client(key=API_KEY)
 
 app = Flask(__name__)
 
 # Define avoided segments globally
 avoid_list = [
-    [(24.7970264, 46.719939), (24.7388275, 46.59441409999999)],
-    [(24.954535, 47.0142416), (24.7258606, 46.583506)],
-    [(24.796827, 46.5643251), (24.7089077, 46.6195443)],
-    [(24.9229714, 46.7204701), (24.796827, 46.5643251)],
-    [(24.796827, 46.5643251), (24.6575642, 46.5630617)],
-    [(24.7575596, 46.6895021), (24.70444, 46.6237931)],
+    [(24.761297, 46.647798), (24.790838, 46.717976)],
+    [(24.585388, 46.709163), (24.611205, 46.764367)],
+    [(24.676630, 46.641683), (24.713557, 46.759786)],
+    [(24.883136, 46.585421), (24.680947, 46.687711)],
+    [(24.704598, 46.623868), (24.796673, 46.817037)],
+    [(24.785575, 46.568700), (24.869630, 46.803826)],
+    [(24.789092, 46.724027), (24.633372, 46.801978)],
 ]
+
+def data_retreival():
+    RDS_HOST = "database-2.cnqamusmkwon.eu-north-1.rds.amazonaws.com"
+    RDS_PORT = 3306  # MySQL default port
+    DB_USER = "root"
+    DB_PASSWORD = "mkmk162345"
+    DB_NAME = "traffic"
+
+    # SQL Query to retrieve data
+    query = "SELECT * FROM traffic_counter_road"  # Replace with your table name
+
+    # Connect to the RDS MySQL instance
+    try:
+        connection = pymysql.connect(
+            host=RDS_HOST,
+            port=RDS_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            cursorclass=pymysql.cursors.DictCursor  # Fetches the result as a dictionary
+        )
+
+        # Execute the query and fetch the data
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            results = cursor.fetchall()  # Fetch all rows from the table
+            
+            # Convert the query results into a Pandas DataFrame
+            df = pd.DataFrame(results)
+
+        # Show the first 5 rows of the DataFrame
+        return df.iloc[1]
+
+    except pymysql.MySQLError as e:
+        print(f"Error: {e}")
+
+    finally:
+        if connection:
+            connection.close()
+
 
 # Fetch directions from Google Maps API
 def get_directions(start, end, alternatives=False):
@@ -215,18 +258,35 @@ def calculate_route():
     
     # Try to find a direct route first
     route = find_valid_route(start, end, avoid_list)
+    fastest_route = get_directions(start, end, alternatives=False)
 
     if not route:
         # If no valid direct route is found, try to find an alternative recursively
         route = recursive_route_search(start, end, avoid_list)
 
-    if route:
-        route_json = format_route_to_json(route)
-        return jsonify({
-            'status': 'success',
-            'route': route_json
-        })
+    if route or fastest_route:
+        fastest_route_json = format_route_to_json(fastest_route[0])
+        if route:
+            route_json = format_route_to_json(route)
+            if route_json == fastest_route_json:
+                return jsonify({
+                    'status': 'success-one',
+                    'normal_route': route_json,
+                    'message': 'The fastest route is also the normal route.'
+                })
+            else:
+                return jsonify({
+                    'status': 'success-both',
+                    'normal_route': route_json,
+                    'fastest_route': fastest_route_json
+                })
+        else:
+            return jsonify({
+                'status': 'success-fastest',
+                'fastest_route': fastest_route_json
+            })
     else:
+        print(fastest_route)
         return jsonify({
             'status': 'error',
             'message': 'All routes cross an avoided street or no valid route found.'
@@ -241,6 +301,24 @@ def format_route_to_json(route):
         'duration': route['legs'][0]['duration']['text'],
         'overview_polyline': route['overview_polyline']['points']
     }
+
+# Define vehicle costs as functions
+def get_truck_cost():
+    data = data_retreival()
+    return data['truck_cost']  # Example cost for truck, can be dynamic
+
+def get_car_cost():
+    data = data_retreival()
+    return data['car_cost']  # Example cost for truck, can be dynamic
+
+def get_motorbike_cost():
+    data = data_retreival()
+    return data['motorbike_cost']  # Example cost for truck, can be dynamic
+
+# Define a function to return the total number of vehicles
+def get_total_vehicles():
+    data = data_retreival()
+    return data['road_current']  # Example cost for truck, can be dynamic
 
 # Return avoided routes on map initialization
 @app.route('/get-avoided-routes', methods=['GET'])
@@ -259,9 +337,46 @@ def get_avoided_routes():
     })
 
 
+@app.route('/get-vehicle-info', methods=['GET'])
+def get_vehicle_info():
+    return jsonify({
+        'truck_cost': get_truck_cost(),
+        'car_cost': get_car_cost(),
+        'motorbike_cost': get_motorbike_cost(),
+        'total_vehicles': get_total_vehicles()
+    })
+
+@app.route('/get-fastest-route', methods=['POST'])
+def get_fastest_route():
+    data = request.json
+    start = data['start']
+    end = data['end']
+    
+    # Fetch the fastest route from start to end
+    fastest_route = get_directions(start, end, alternatives=False)
+
+    if fastest_route:
+        route_json = format_route_to_json(fastest_route[0])
+        return jsonify({
+            'status': 'success',
+            'route': route_json
+        })
+    else:
+        return jsonify({
+            'status': 'error',
+            'message': 'No fastest route found.'
+        })
+
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template(
+        'index.html',
+        truck_cost=get_truck_cost(),
+        car_cost=get_car_cost(),
+        motorbike_cost=get_motorbike_cost(),
+        total_vehicles=get_total_vehicles()
+    )
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5858,debug=True)
