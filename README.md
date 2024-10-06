@@ -27,8 +27,7 @@
    - A state-of-the-art object detection model is implemented to identify vehicle types and license plates in real-time. The model is trained using labeled datasets derived from the collected video footage.
 
 2. **Optical Character Recognition (OCR)**:
-   - Applied to accurately read and interpret license plate information from the detected vehicles, ensuring reliable identification for traffic management.
-
+   - Implemented using a transformer model to accurately read and interpret license plate information from the detected vehicles, ensuring reliable identification for traffic       management.
 ### Dynamic Congestion Pricing
 
 1. **Cost Adjustment**:
