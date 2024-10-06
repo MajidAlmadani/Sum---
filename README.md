@@ -66,9 +66,9 @@
   - LinkedIn: [majidalmadani](https://www.linkedin.com/in/majidalmadani/) 
 
 - **[Abdulaziz Koja]**
-  - Email: []     
-  - GitHub: [yourusername]()  
-  - LinkedIn: [yourlinkedin]()  
+  - Email: [Abdulazizkoja.1@gmail.com]     
+  - GitHub: [Abdulazizkoja1](https://github.com/Abdulazizkoja1)  
+  - LinkedIn: [abdulazizkoja](www.linkedin.com/in/abdulazizkoja) 
 
 - **[Ziyad Qutub]**
   - Email: [ziad36311@gmail.com] 
