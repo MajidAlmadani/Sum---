@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vehicle Dashboard</title>
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBvsVrsscV50q6bVV7ofEm2tzCz08F1k1A&libraries=geometry"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <style>
+        /* General styling */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        /* Dashboard styling */
+        .dashboard {
+            background-color: #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Grid background */
+        body {
+            background-image: linear-gradient(#d3d3d3 1px, transparent 1px),
+                linear-gradient(90deg, #d3d3d3 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* Icon and text styling */
+        .dashboard-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .dashboard-item i {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        .dashboard-item .label {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .dashboard-item .cost {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .timestamp {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Map container */
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+
+        /* Form buttons */
+        #routeForm {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        #routeForm button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #routeForm button:hover {
+            background-color: #45a049;
+        }
+
+        /* Align buttons below the map */
+        #routeForm {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Dashboard Section -->
+    <div class="dashboard">
+        <div class="dashboard-item">
+            <i class="fas fa-truck"></i>
+            <div>
+                <span class="label">Truck: </span>
+                <span class="cost" id="truckCost">{{ truck_cost }} SAR</span>
+            </div>
+        </div>
+        <div class="dashboard-item">
+            <i class="fas fa-car"></i>
+            <div>
+                <span class="label">Car: </span>
+                <span class="cost" id="carCost">{{ car_cost }} SAR</span>
+            </div>
+        </div>
+        <div class="dashboard-item">
+            <i class="fas fa-motorcycle"></i>
+            <div>
+                <span class="label">Motorbike: </span>
+                <span class="cost" id="motorbikeCost">{{ motorbike_cost }} SAR</span>
+            </div>
+        </div>
+        <div class="dashboard-item">
+            <i class="fas fa-tachometer-alt"></i>
+            <div>
+                <span class="label">Total Vehicles: </span>
+                <span class="cost" id="vehicleCounter">{{ total_vehicles }}</span>
+            </div>
+        </div>
+        <div class="dashboard-item">
+            <i class="fas fa-clock"></i>
+            <div class="timestamp" id="timestamp"></div>
+        </div>
+    </div>
+
+    <!-- Google Map Section -->
+    <div id="map" style="height: 500px; width: 100%"></div>
+
+    <!-- Form Section (Buttons below the map) -->
+    <form id="routeForm">
+        <input type="hidden" id="startLatLng" />
+        <input type="hidden" id="endLatLng" />
+        <button type="submit" disabled>Get Route</button>
+        <button type="button" id="resetBtn">Reset</button>
+        <!-- Section to display route information -->
+        <div id="routeInfo" style="text-align: center; margin-top: 20px;">
+            <p id="routeDetails"></p>
+        </div>
+
+    </form>
+
+    <!-- JavaScript for Real-time Timestamp -->
+    <script>
+        // Initialize variables
+        let map, routePath, fastestRoutePath, startMarker, endMarker;
+        let startLatLng = null;
+        let endLatLng = null;
+        let avoidedRoutePaths = []; // Store the avoided route paths
+        let drawnRoutes = [];
+
+        // Update timestamp every second
+        function updateTime() {
+            const now = new Date();
+            const formattedTime = now.toLocaleString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            });
+            document.getElementById("timestamp").innerText = formattedTime;
+        }
+        setInterval(updateTime, 1000); // Update time every second
+
+        // Initialize the map
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 24.7136, lng: 46.6753 }, // Riyadh coordinates
+                zoom: 12,
+            });
+
+            // Add click event listener to capture start and end locations
+            map.addListener("click", function (event) {
+                handleMapClick(event.latLng);
+            });
+
+            // Load and display avoided routes
+            loadAvoidedRoutes();
+        }
+
+        // Load avoided routes from the server and display them on the map
+        function loadAvoidedRoutes() {
+            $.ajax({
+                url: "/get-avoided-routes",
+                type: "GET",
+                success: function (response) {
+                    if (response.status === "success") {
+                        drawAvoidedRoutes(response.avoided_routes); // Draw avoided routes in red
+                    } else {
+                        alert("Failed to load avoided routes.");
+                    }
+                },
+                error: function () {
+                    alert("Failed to retrieve the avoided routes.");
+                },
+            });
+        }
+
+        // Draw the avoided routes in red
+        function drawAvoidedRoutes(avoidedRoutes) {
+            // Remove any existing avoided routes
+            avoidedRoutePaths.forEach((path) => path.setMap(null));
+            avoidedRoutePaths = [];
+
+            avoidedRoutes.forEach((route) => {
+                const decodedPolyline = google.maps.geometry.encoding.decodePath(
+                    route.overview_polyline
+                );
+                const avoidedPath = new google.maps.Polyline({
+                    path: decodedPolyline,
+                    geodesic: true,
+                    strokeColor: "#FF0000", // Red color for avoided routes
+                    strokeOpacity: 0.7,
+                    strokeWeight: 4,
+                });
+                avoidedPath.setMap(map);
+                avoidedRoutePaths.push(avoidedPath); // Store the avoided route
+            });
+        }
+
+        // Handle clicks on the map to select start and end points
+        function handleMapClick(latLng) {
+            if (!startLatLng) {
+                // Set the start marker
+                startLatLng = latLng;
+                placeMarker(latLng, "Start");
+                $("#startLatLng").val(latLng.lat() + "," + latLng.lng());
+
+                // Log the start point for debugging
+                console.log("Start LatLng set: ", $("#startLatLng").val());
+            } else if (!endLatLng) {
+                // Set the end marker
+                endLatLng = latLng;
+                placeMarker(latLng, "End");
+                $("#endLatLng").val(latLng.lat() + "," + latLng.lng());
+
+                // Log the end point for debugging
+                console.log("End LatLng set: ", $("#endLatLng").val());
+
+                // Enable the "Get Route" button after both points are selected
+                $("button[type=submit]").prop("disabled", false);
+            }
+        }
+
+        // Place marker for the selected location (start or end)
+        function placeMarker(latLng, label) {
+            let marker = new google.maps.Marker({
+                position: latLng,
+                map: map,
+                label: label,
+                draggable: false,
+            });
+
+            if (label === "Start") {
+                if (startMarker) startMarker.setMap(null); // Remove old marker
+                startMarker = marker;
+            } else if (label === "End") {
+                if (endMarker) endMarker.setMap(null); // Remove old marker
+                endMarker = marker;
+            }
+        }
+
+        $("#routeForm").on("submit", function (e) {
+            e.preventDefault();
+
+            const start = $("#startLatLng").val();
+            const end = $("#endLatLng").val();
+
+            // Debugging: Log the start and end values before sending
+            console.log("Submitting Start: ", start);
+            console.log("Submitting End: ", end);
+
+            if (!start || !end) {
+                alert("Start and End points are required.");
+                return;
+            }
+
+            // Make an AJAX request to get both normal and fastest routes
+            $.ajax({
+                url: "/calculate-route",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ start, end }),
+                success: function (response) {
+
+                    let routeInfo = ''; // Clear previous content
+
+                    if (response.status === "success-both") {
+                        if (response.normal_route && response.normal_route.overview_polyline) {
+                            drawMainRoute(response.normal_route.overview_polyline, "#0000FF"); // Draw the normal route in blue
+                            routeInfo += `Normal Route: ${response.normal_route.distance}, ${response.normal_route.duration} <br/>`;
+
+                        }
+
+                        if (response.fastest_route && response.fastest_route.overview_polyline) {
+                            drawMainRoute(response.fastest_route.overview_polyline, "#00FF00"); // Draw the fastest route in green
+                            routeInfo += `Fastest Route: ${response.fastest_route.distance}, ${response.fastest_route.duration} <br/>`;
+
+                        }
+                    } else if (response.status === 'success-fastest') {
+                        if (response.fastest_route && response.fastest_route.overview_polyline) {
+                            drawMainRoute(response.fastest_route.overview_polyline, "#00FFD0FF"); // Draw the single route in yellow
+                            routeInfo += `Fastest Route: ${response.fastest_route.distance}, ${response.fastest_route.duration} <br/>`;
+
+                        }
+                    } else if (response.status === "success-one") {
+                        if (response.normal_route && response.normal_route.overview_polyline) {
+                            drawMainRoute(response.normal_route.overview_polyline, "#0015FFFF"); // Draw the single route in yellow
+                            routeInfo += `Normal Route: ${response.normal_route.distance}, ${response.normal_route.duration} <br/>`;
+                        }
+                        alert(response.message); // Alert that the fastest and normal routes are the same
+                    } else {
+                        alert(response.message); // Show an error message if no route was found
+                    }
+                    $("#routeDetails").html(routeInfo);
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error: ", error);
+                    alert("Failed to retrieve the routes. Please try again.");
+                },
+            });
+        });
+
+
+        // Draw the main route in blue
+        function drawMainRoute(polyline, color) {
+            const decodedPolyline = google.maps.geometry.encoding.decodePath(polyline);
+
+            const path = new google.maps.Polyline({
+                path: decodedPolyline,
+                geodesic: true,
+                strokeColor: color, // Use the specified color (blue or green)
+                strokeOpacity: 1.0,
+                strokeWeight: 4,
+            });
+
+            path.setMap(map);
+
+            // Store the route in the drawnRoutes array for later removal
+            drawnRoutes.push(path);
+
+            // Adjust the map to fit the route
+            map.fitBounds(getBounds(decodedPolyline));
+        }
+
+
+        // Reset button handler: clear markers, route, and form
+        // Reset button handler: clear markers, routes, and form
+        $("#resetBtn").on("click", function () {
+            let routeInfo = ''; // Clear previous content
+            // Remove markers from the map
+            if (startMarker) startMarker.setMap(null);
+            if (endMarker) endMarker.setMap(null);
+
+            // Clear all drawn routes from the map
+            drawnRoutes.forEach(route => route.setMap(null));
+            drawnRoutes = [];  // Reset the array after clearing
+
+            // Clear any avoided route paths from the map
+            avoidedRoutePaths.forEach(path => path.setMap(null));
+            avoidedRoutePaths = [];
+
+            // Clear stored start and end points
+            startLatLng = null;
+            endLatLng = null;
+
+            // Clear hidden input fields
+            $("#startLatLng").val("");
+            $("#endLatLng").val("");
+
+            // Disable the "Get Route" button
+            $("button[type=submit]").prop("disabled", true);
+
+            $("#routeDetails").html(routeInfo);
+
+
+            // Reload avoided routes (if you want to keep showing them on the map after reset)
+            loadAvoidedRoutes();
+        });
+
+        function getBounds(decodedPolyline) {
+            const bounds = new google.maps.LatLngBounds();
+            decodedPolyline.forEach((point) => {
+                bounds.extend(point);
+            });
+            return bounds;
+        }
+
+
+        // Initialize the map
+        initMap();
+
+        // Update timestamp every second
+        function updateTime() {
+            const now = new Date();
+            const formattedTime = now.toLocaleString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            });
+            document.getElementById("timestamp").innerText = formattedTime;
+        }
+        setInterval(updateTime, 1000); // Update time every second
+
+        // Function to fetch updated vehicle information from the server
+        function fetchVehicleInfo() {
+            $.ajax({
+                url: "/get-vehicle-info",
+                type: "GET",
+                success: function (response) {
+                    // Update the dashboard values with the latest info
+                    $("#truckCost").text(response.truck_cost + " SAR");
+                    $("#carCost").text(response.car_cost + " SAR");
+                    $("#motorbikeCost").text(response.motorbike_cost + " SAR");
+                    $("#vehicleCounter").text(response.total_vehicles);
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error fetching vehicle info:", error);
+                },
+            });
+        }
+
+        // Fetch the vehicle info every second
+        setInterval(fetchVehicleInfo, 1000); // Update the dashboard every second
+    </script>
+</body>
+
+</html>
