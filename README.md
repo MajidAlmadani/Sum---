@@ -45,17 +45,26 @@
    - Displays current traffic conditions and suggests the fastest routes without incurring congestion fees, enhancing user experience and traffic management efficiency.
 
 
-## Installation
-
-
-
-
-
-
-
 ## Result
+### Selected Roads:
 
+- Northern Ring Road
+- Southern Ring Road
+- Eastern Ring Road
+- Makkah Al Mukarramah Branch Road
+- King Fahd Road
+- King Abdullah Road
+- Al Thoumamah Road
+  
+### Model Performance:
 
+- YOLOv8 Mean Average Precision (mAP): 88%
+- OCR Transformer Accuracy: 53.57%
+
+## Video Demonstration
+### Watch the YOLO model in action:
+
+[![Watch the video]()](https://drive.google.com/file/d/1aBfvWlwHXjOWxzdHkYaG5UzohRD-8SH1/view?usp=sharing)
 
 ## Project Members
 
